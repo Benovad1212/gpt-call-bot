@@ -2,7 +2,6 @@ from flask import Flask, request, Response
 import os
 import openai
 from twilio.twiml.voice_response import VoiceResponse
-from gtts import gTTS
 import tempfile
 
 app = Flask(__name__)
@@ -34,39 +33,39 @@ def process():
             timeout=5,
             speech_timeout="auto"
         )
-        gather.say("Sorry, I didn’t hear anything. Can you repeat that?", voice="man")
+        gather.say("Sorry, I didn’t catch that. Could you please repeat?", voice="man")
         return Response(str(response), mimetype='text/xml')
 
-    completion = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a friendly and professional phone agent working for Air Flo Cleaning. "
-                    "You only handle incoming phone calls from potential customers in Tampa and Orlando. "
-                    "You offer air duct and dryer vent cleaning services. The standard cleaning price is $99 per AC unit. "
-                    "If the customer mentions mold or black dirt, explain that it could be mildew or bacteria and that a technician can come for a free inspection. "
-                    "Never diagnose. Always ask how many units they have, if it's a home or apartment, and the zip code or address. "
-                    "Let them know the technician can do both the estimate and the service on the same day. "
-                    "Mention that the deep cleaning and additional services (sanitizing, UV light) will be priced on-site. "
-                    "You do not schedule appointments on Saturdays and only between 9AM–6PM. "
-                    "Keep the tone polite, informative, and efficient. Keep the conversation going until the caller is satisfied or ends the call."
-                )
-            },
-            {"role": "user", "content": speech_text}
-        ]
-    )
+    try:
+        completion = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Joey, a friendly and professional phone agent working for Air Flo Cleaning. "
+                        "You help customers in Tampa and Orlando with air duct and dryer vent cleaning. "
+                        "The standard cleaning price is $99 per AC unit. "
+                        "If the customer mentions mold or mildew, let them know a technician can visit for a free inspection. "
+                        "Always ask how many units they have, if it's a house or apartment, and their zip code. "
+                        "Tell them service can often be done the same day. "
+                        "You do not book appointments on Saturdays. Working hours are 9 AM to 6 PM. "
+                        "Keep the tone polite, efficient, and helpful."
+                    )
+                },
+                {"role": "user", "content": speech_text}
+            ]
+        )
 
-    answer = completion.choices[0].message["content"]
+        answer = completion.choices[0].message["content"]
+        
+        # Use Twilio native voice for better quality (instead of gTTS)
+        response.say(answer, voice="man")
 
-    # Convert to speech
-    tts = gTTS(answer)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-        tts.save(fp.name)
-        response.play(fp.name)
+    except Exception as e:
+        response.say("Sorry, there was a problem processing your request. Please try again later.", voice="man")
 
-    # Ask follow-up question to keep call alive
+    # Keep the conversation going
     gather = response.gather(
         input="speech",
         action="/process",
