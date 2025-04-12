@@ -18,7 +18,7 @@ def voice():
         timeout=5,
         speech_timeout="auto"
     )
-    gather.say("Hey, it's Joey from Air Flo Cleaning. How can I help you today?")
+    gather.say("Hey, it's Joey from Air Flo Cleaning. How can I help you today?", voice="man")
     return Response(str(response), mimetype="text/xml")
 
 @app.route("/process", methods=["POST"])
@@ -27,10 +27,16 @@ def process():
     response = VoiceResponse()
 
     if not speech_text:
-        response.say("Sorry, I didn't hear anything.")
-        return Response(str(response), mimetype="text/xml")
+        gather = response.gather(
+            input="speech",
+            action="/process",
+            method="POST",
+            timeout=5,
+            speech_timeout="auto"
+        )
+        gather.say("Sorry, I didn’t hear anything. Can you repeat that?", voice="man")
+        return Response(str(response), mimetype='text/xml')
 
-    # ChatGPT logic
     completion = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
@@ -45,7 +51,7 @@ def process():
                     "Let them know the technician can do both the estimate and the service on the same day. "
                     "Mention that the deep cleaning and additional services (sanitizing, UV light) will be priced on-site. "
                     "You do not schedule appointments on Saturdays and only between 9AM–6PM. "
-                    "Keep the tone polite, informative, and efficient."
+                    "Keep the tone polite, informative, and efficient. Keep the conversation going until the caller is satisfied or ends the call."
                 )
             },
             {"role": "user", "content": speech_text}
@@ -60,7 +66,17 @@ def process():
         tts.save(fp.name)
         response.play(fp.name)
 
-    return Response(str(response), mimetype="text/xml")
+    # Ask follow-up question to keep call alive
+    gather = response.gather(
+        input="speech",
+        action="/process",
+        method="POST",
+        timeout=5,
+        speech_timeout="auto"
+    )
+    gather.say("Is there anything else I can help you with?", voice="man")
+
+    return Response(str(response), mimetype='text/xml')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
