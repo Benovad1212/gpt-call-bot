@@ -10,13 +10,27 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 @app.route("/voice", methods=["POST"])
 def voice():
+    response = VoiceResponse()
+    gather = response.gather(
+        input="speech",
+        action="/process",
+        method="POST",
+        timeout=5,
+        speech_timeout="auto"
+    )
+    gather.say("Hey, it's Joey from Air Flo Cleaning. How can I help you today?")
+    return Response(str(response), mimetype="text/xml")
+
+@app.route("/process", methods=["POST"])
+def process():
     speech_text = request.form.get("SpeechResult")
     response = VoiceResponse()
 
     if not speech_text:
         response.say("Sorry, I didn't hear anything.")
-        return Response(str(response), mimetype='text/xml')
+        return Response(str(response), mimetype="text/xml")
 
+    # ChatGPT logic
     completion = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
@@ -46,7 +60,7 @@ def voice():
         tts.save(fp.name)
         response.play(fp.name)
 
-    return Response(str(response), mimetype='text/xml')
+    return Response(str(response), mimetype="text/xml")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
