@@ -2,7 +2,6 @@ from flask import Flask, request, Response
 import os
 import openai
 from twilio.twiml.voice_response import VoiceResponse
-import tempfile
 
 app = Flask(__name__)
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -25,7 +24,7 @@ def process():
     speech_text = request.form.get("SpeechResult")
     response = VoiceResponse()
 
-    if not speech_text:
+    if not speech_text or speech_text.strip() == "":
         gather = response.gather(
             input="speech",
             action="/process",
@@ -33,8 +32,11 @@ def process():
             timeout=5,
             speech_timeout="auto"
         )
-        gather.say("Sorry, I didn’t catch that. Could you please repeat?", voice="man")
+        gather.say("I didn’t catch that. Can you say it again, maybe a bit slower?", voice="man")
         return Response(str(response), mimetype='text/xml')
+
+    # Echo what the user said
+    response.say(f"You said: {speech_text}", voice="man")
 
     try:
         completion = openai.ChatCompletion.create(
@@ -58,8 +60,6 @@ def process():
         )
 
         answer = completion.choices[0].message["content"]
-        
-        # Use Twilio native voice for better quality (instead of gTTS)
         response.say(answer, voice="man")
 
     except Exception as e:
